@@ -1,13 +1,24 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
 
-#IMAGE="progrium/buildstep"
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+APP="$1"; IMAGE="dokku/$APP"
+COMMAND=$(cat <<EOF
+apt-get -y update 
+apt-get install -y curl pkg-config
+curl -s https://raw.githubusercontent.com/h2non/bimg/master/preinstall.sh | sudo bash -
+echo "-----> vips installed!"
+sleep 1 # wait so that docker run has not exited before docker attach
+EOF
+)
 
-dokku_log_info1 "Installing VIPS..."
-
-CMD="apt-get update && apt-get install -y libvips libvips-dev"
-
-ID=$(docker run -d $IMAGE /bin/sh -c "$CMD")
-docker attach $ID
-test $(docker wait $ID) -eq 0
-docker commit $ID $IMAGE > /dev/null
+if [ "$INSTALL_VIPS" = "false" ]
+then
+  echo "-----> skipping vips install..."
+else
+  echo "-----> Installing vips ..."
+  id=$(docker run -d $IMAGE /bin/bash -e -c "$COMMAND")
+  #enable logs
+  docker attach $id
+  test $(docker wait $id) -eq 0
+  docker commit $id $IMAGE > /dev/null
+fi
